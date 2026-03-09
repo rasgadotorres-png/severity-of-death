@@ -3,15 +3,15 @@
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', monospace; touch-action: none; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
         canvas { display: block; }
-        #ui { position: fixed; top: 10px; left: 10px; color: #0ff; font-weight: bold; font-size: 20px; pointer-events: none; }
-        #msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #f0f; font-size: 30px; text-align: center; display: block; }
+        #ui { position: fixed; top: 15px; left: 15px; color: #0ff; font-weight: bold; font-size: 24px; pointer-events: none; text-shadow: 0 0 10px #0ff; }
+        #msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #f0f; font-size: 32px; text-align: center; display: block; text-shadow: 0 0 15px #f0f; font-weight: bold; }
     </style>
 </head>
 <body>
     <div id="ui">SCORE: <span id="score">0</span></div>
-    <div id="msg">TOCA PARA EMPEZAR<br><small style="font-size:15px; color:white">Cambia la gravedad</small></div>
+    <div id="msg">GRAVITY HACKER<br><small style="font-size:16px; color:#fff">Toca para invertir la gravedad</small></div>
     <canvas id="gameCanvas"></canvas>
 
 <script>
@@ -22,22 +22,20 @@
 
     let gameActive = false;
     let score = 0;
-    let gameSpeed = 5;
+    let gameSpeed = 6;
     
-    // Configuración del jugador
     const player = {
-        x: 50,
+        x: 60,
         y: 0,
-        w: 30,
-        h: 30,
-        gravity: 0.6,
+        w: 35,
+        h: 35,
+        gravity: 0.8,
         velocity: 0,
         onCeiling: false,
         color: '#0ff'
     };
 
     let obstacles = [];
-    let particles = [];
 
     function resize() {
         canvas.width = window.innerWidth;
@@ -48,12 +46,12 @@
     resize();
 
     function createObstacle() {
-        const height = Math.random() * 100 + 50;
+        const height = Math.random() * 120 + 60;
         const isCeiling = Math.random() > 0.5;
         obstacles.push({
             x: canvas.width,
             y: isCeiling ? 0 : canvas.height - height,
-            w: 30,
+            w: 35,
             h: height,
             color: '#f00'
         });
@@ -61,7 +59,7 @@
 
     function resetGame() {
         score = 0;
-        gameSpeed = 5;
+        gameSpeed = 6;
         obstacles = [];
         player.velocity = 0;
         player.onCeiling = false;
@@ -72,7 +70,6 @@
     function update() {
         if (!gameActive) return;
 
-        // Gravedad
         if (player.onCeiling) {
             player.velocity -= player.gravity;
         } else {
@@ -81,7 +78,6 @@
         
         player.y += player.velocity;
 
-        // Límites suelo/techo
         if (player.y + player.h > canvas.height) {
             player.y = canvas.height - player.h;
             player.velocity = 0;
@@ -90,46 +86,47 @@
             player.velocity = 0;
         }
 
-        // Obstáculos
-        if (Math.random() < 0.02) createObstacle();
+        if (Math.random() < 0.025) createObstacle();
 
         obstacles.forEach((obs, index) => {
             obs.x -= gameSpeed;
             
-            // Colisión
+            // COLISIÓN + VIBRACIÓN FUERTE
             if (player.x < obs.x + obs.w && player.x + player.w > obs.x &&
                 player.y < obs.y + obs.h && player.y + player.h > obs.y) {
                 gameActive = false;
+                if (window.navigator.vibrate) window.navigator.vibrate(200); // Vibración de choque
                 msgEl.style.display = 'block';
-                msgEl.innerHTML = "GAME OVER<br>SCORE: " + Math.floor(score) + "<br><small>Toca para reintentar</small>";
+                msgEl.innerHTML = "SISTEMA CAÍDO<br>SCORE: " + Math.floor(score) + "<br><small>Toca para reiniciar</small>";
             }
 
             if (obs.x + obs.w < 0) obstacles.splice(index, 1);
         });
 
-        score += 0.1;
+        score += 0.15;
         scoreEl.innerText = Math.floor(score);
-        gameSpeed += 0.001;
+        gameSpeed += 0.0015;
     }
 
     function draw() {
-        // Fondo con rastro
-        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.25)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // Suelo y Techo neón
-        ctx.fillStyle = '#333';
-        ctx.fillRect(0, 0, canvas.width, 5);
-        ctx.fillRect(0, canvas.height - 5, canvas.width, 5);
+        // Decoración Neón Suelo/Techo
+        ctx.fillStyle = player.onCeiling ? '#f0f' : '#0ff';
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.fillRect(0, 0, canvas.width, 4);
+        ctx.fillRect(0, canvas.height - 4, canvas.width, 4);
 
         // Jugador
-        ctx.shadowBlur = 15;
+        ctx.shadowBlur = 20;
         ctx.shadowColor = player.color;
         ctx.fillStyle = player.color;
         ctx.fillRect(player.x, player.y, player.w, player.h);
 
         // Obstáculos
-        ctx.shadowBlur = 10;
+        ctx.shadowBlur = 15;
         ctx.shadowColor = '#f00';
         ctx.fillStyle = '#f00';
         obstacles.forEach(obs => {
@@ -145,7 +142,8 @@
         requestAnimationFrame(loop);
     }
 
-    window.addEventListener('pointerdown', () => {
+    window.addEventListener('pointerdown', (e) => {
+        e.preventDefault();
         if (!gameActive) {
             resetGame();
             gameActive = true;
@@ -153,11 +151,12 @@
         } else {
             player.onCeiling = !player.onCeiling;
             player.color = player.onCeiling ? '#f0f' : '#0ff';
+            // VIBRACIÓN SUAVE AL CAMBIAR
+            if (window.navigator.vibrate) window.navigator.vibrate(40);
         }
-    });
+    }, { passive: false });
 
     loop();
 </script>
 </body>
 </html>
-
