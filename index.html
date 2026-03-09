@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <style>
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Courier New', monospace; touch-action: none; }
+        canvas { display: block; }
+        #ui { position: fixed; top: 10px; left: 10px; color: #0ff; font-weight: bold; font-size: 20px; pointer-events: none; }
+        #msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #f0f; font-size: 30px; text-align: center; display: block; }
+    </style>
+</head>
+<body>
+    <div id="ui">SCORE: <span id="score">0</span></div>
+    <div id="msg">TOCA PARA EMPEZAR<br><small style="font-size:15px; color:white">Cambia la gravedad</small></div>
+    <canvas id="gameCanvas"></canvas>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score');
+    const msgEl = document.getElementById('msg');
+
+    let gameActive = false;
+    let score = 0;
+    let gameSpeed = 5;
+    
+    // Configuración del jugador
+    const player = {
+        x: 50,
+        y: 0,
+        w: 30,
+        h: 30,
+        gravity: 0.6,
+        velocity: 0,
+        onCeiling: false,
+        color: '#0ff'
+    };
+
+    let obstacles = [];
+    let particles = [];
+
+    function resize() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+        player.y = canvas.height - 100;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    function createObstacle() {
+        const height = Math.random() * 100 + 50;
+        const isCeiling = Math.random() > 0.5;
+        obstacles.push({
+            x: canvas.width,
+            y: isCeiling ? 0 : canvas.height - height,
+            w: 30,
+            h: height,
+            color: '#f00'
+        });
+    }
+
+    function resetGame() {
+        score = 0;
+        gameSpeed = 5;
+        obstacles = [];
+        player.velocity = 0;
+        player.onCeiling = false;
+        player.y = canvas.height - 100;
+        scoreEl.innerText = score;
+    }
+
+    function update() {
+        if (!gameActive) return;
+
+        // Gravedad
+        if (player.onCeiling) {
+            player.velocity -= player.gravity;
+        } else {
+            player.velocity += player.gravity;
+        }
+        
+        player.y += player.velocity;
+
+        // Límites suelo/techo
+        if (player.y + player.h > canvas.height) {
+            player.y = canvas.height - player.h;
+            player.velocity = 0;
+        } else if (player.y < 0) {
+            player.y = 0;
+            player.velocity = 0;
+        }
+
+        // Obstáculos
+        if (Math.random() < 0.02) createObstacle();
+
+        obstacles.forEach((obs, index) => {
+            obs.x -= gameSpeed;
+            
+            // Colisión
+            if (player.x < obs.x + obs.w && player.x + player.w > obs.x &&
+                player.y < obs.y + obs.h && player.y + player.h > obs.y) {
+                gameActive = false;
+                msgEl.style.display = 'block';
+                msgEl.innerHTML = "GAME OVER<br>SCORE: " + Math.floor(score) + "<br><small>Toca para reintentar</small>";
+            }
+
+            if (obs.x + obs.w < 0) obstacles.splice(index, 1);
+        });
+
+        score += 0.1;
+        scoreEl.innerText = Math.floor(score);
+        gameSpeed += 0.001;
+    }
+
+    function draw() {
+        // Fondo con rastro
+        ctx.fillStyle = 'rgba(5, 5, 5, 0.3)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // Suelo y Techo neón
+        ctx.fillStyle = '#333';
+        ctx.fillRect(0, 0, canvas.width, 5);
+        ctx.fillRect(0, canvas.height - 5, canvas.width, 5);
+
+        // Jugador
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = player.color;
+        ctx.fillStyle = player.color;
+        ctx.fillRect(player.x, player.y, player.w, player.h);
+
+        // Obstáculos
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = '#f00';
+        ctx.fillStyle = '#f00';
+        obstacles.forEach(obs => {
+            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+        });
+        
+        ctx.shadowBlur = 0;
+    }
+
+    function loop() {
+        update();
+        draw();
+        requestAnimationFrame(loop);
+    }
+
+    window.addEventListener('pointerdown', () => {
+        if (!gameActive) {
+            resetGame();
+            gameActive = true;
+            msgEl.style.display = 'none';
+        } else {
+            player.onCeiling = !player.onCeiling;
+            player.color = player.onCeiling ? '#f0f' : '#0ff';
+        }
+    });
+
+    loop();
+</script>
+</body>
+</html>
+
