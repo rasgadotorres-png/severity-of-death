@@ -1,162 +1,121 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <title>Gravity 3D</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <style>
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; touch-action: none; }
-        canvas { display: block; }
-        #ui { position: fixed; top: 15px; left: 15px; color: #0ff; font-weight: bold; font-size: 24px; pointer-events: none; text-shadow: 0 0 10px #0ff; }
-        #msg { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #f0f; font-size: 32px; text-align: center; display: block; text-shadow: 0 0 15px #f0f; font-weight: bold; }
+        body { margin: 0; overflow: hidden; background: #000; touch-action: none; }
+        #ui { position: fixed; top: 20px; left: 20px; color: #0ff; font-family: Arial; font-size: 24px; font-weight: bold; pointer-events: none; }
     </style>
 </head>
 <body>
     <div id="ui">SCORE: <span id="score">0</span></div>
-    <div id="msg">GRAVITY HACKER<br><small style="font-size:16px; color:#fff">Toca para invertir la gravedad</small></div>
-    <canvas id="gameCanvas"></canvas>
+    <script type="importmap">
+        { "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+    </script>
 
-<script>
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-    const scoreEl = document.getElementById('score');
-    const msgEl = document.getElementById('msg');
+<script type="module">
+    import * as THREE from 'three';
 
-    let gameActive = false;
+    // 1. ESCENA, CÁMARA Y RENDER
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // 2. JUGADOR (Cubo 3D)
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshPhongMaterial({ color: 0x00ffff, emissive: 0x00ffff, emissiveIntensity: 0.5 });
+    const player = new THREE.Mesh(geometry, material);
+    scene.add(player);
+
+    // 3. LUCES (Esencial para el 3D)
+    const light = new THREE.PointLight(0xffffff, 50);
+    light.position.set(0, 5, 5);
+    scene.add(light);
+    scene.add(new THREE.AmbientLight(0x404040));
+
+    // 4. EL TÚNEL / PISO
+    const floorGeo = new THREE.BoxGeometry(100, 0.5, 10);
+    const floorMat = new THREE.MeshPhongMaterial({ color: 0x222222 });
+    const floor = new THREE.Mesh(floorGeo, floorMat);
+    floor.position.y = -3;
+    scene.add(floor);
+
+    const ceil = new THREE.Mesh(floorGeo, floorMat);
+    ceil.position.y = 3;
+    scene.add(ceil);
+
+    // Variables de juego
     let score = 0;
-    let gameSpeed = 6;
-    
-    const player = {
-        x: 60,
-        y: 0,
-        w: 35,
-        h: 35,
-        gravity: 0.8,
-        velocity: 0,
-        onCeiling: false,
-        color: '#0ff'
-    };
-
+    let gravity = -0.01;
+    let velocity = 0;
+    let gameActive = true;
     let obstacles = [];
 
-    function resize() {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-        player.y = canvas.height - 100;
-    }
-    window.addEventListener('resize', resize);
-    resize();
+    camera.position.z = 8;
+    camera.position.y = 1;
 
-    function createObstacle() {
-        const height = Math.random() * 120 + 60;
-        const isCeiling = Math.random() > 0.5;
-        obstacles.push({
-            x: canvas.width,
-            y: isCeiling ? 0 : canvas.height - height,
-            w: 35,
-            h: height,
-            color: '#f00'
-        });
+    // 5. OBSTÁCULOS 3D
+    function spawnObstacle() {
+        const obsGeo = new THREE.BoxGeometry(1, Math.random() * 3 + 1, 1);
+        const obsMat = new THREE.MeshPhongMaterial({ color: 0xff0055 });
+        const obs = new THREE.Mesh(obsGeo, obsMat);
+        obs.position.x = 15;
+        obs.position.y = Math.random() > 0.5 ? 2 : -2;
+        scene.add(obs);
+        obstacles.push(obs);
     }
 
-    function resetGame() {
-        score = 0;
-        gameSpeed = 6;
-        obstacles = [];
-        player.velocity = 0;
-        player.onCeiling = false;
-        player.y = canvas.height - 100;
-        scoreEl.innerText = score;
-    }
+    function animate() {
+        if (gameActive) {
+            requestAnimationFrame(animate);
 
-    function update() {
-        if (!gameActive) return;
+            // Gravedad y movimiento
+            velocity += gravity;
+            player.position.y += velocity;
 
-        if (player.onCeiling) {
-            player.velocity -= player.gravity;
-        } else {
-            player.velocity += player.gravity;
-        }
-        
-        player.y += player.velocity;
+            // Colisión con suelo/techo
+            if (player.position.y < -2.5) { player.position.y = -2.5; velocity = 0; }
+            if (player.position.y > 2.5) { player.position.y = 2.5; velocity = 0; }
 
-        if (player.y + player.h > canvas.height) {
-            player.y = canvas.height - player.h;
-            player.velocity = 0;
-        } else if (player.y < 0) {
-            player.y = 0;
-            player.velocity = 0;
-        }
+            // Rotación del cubo para que se vea 3D
+            player.rotation.x += 0.05;
+            player.rotation.y += 0.05;
 
-        if (Math.random() < 0.025) createObstacle();
+            // Mover obstáculos
+            obstacles.forEach((obs, index) => {
+                obs.position.x -= 0.15;
+                
+                // Colisión real 3D
+                if (player.position.distanceTo(obs.position) < 1.2) {
+                    gameActive = false;
+                    alert("GAME OVER! Score: " + Math.floor(score));
+                    location.reload();
+                }
 
-        obstacles.forEach((obs, index) => {
-            obs.x -= gameSpeed;
+                if (obs.position.x < -10) {
+                    scene.remove(obs);
+                    obstacles.splice(index, 1);
+                }
+            });
+
+            if (Math.random() < 0.02) spawnObstacle();
             
-            // COLISIÓN + VIBRACIÓN FUERTE
-            if (player.x < obs.x + obs.w && player.x + player.w > obs.x &&
-                player.y < obs.y + obs.h && player.y + player.h > obs.y) {
-                gameActive = false;
-                if (window.navigator.vibrate) window.navigator.vibrate(200); // Vibración de choque
-                msgEl.style.display = 'block';
-                msgEl.innerHTML = "SISTEMA CAÍDO<br>SCORE: " + Math.floor(score) + "<br><small>Toca para reiniciar</small>";
-            }
-
-            if (obs.x + obs.w < 0) obstacles.splice(index, 1);
-        });
-
-        score += 0.15;
-        scoreEl.innerText = Math.floor(score);
-        gameSpeed += 0.0015;
-    }
-
-    function draw() {
-        ctx.fillStyle = 'rgba(5, 5, 5, 0.25)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Decoración Neón Suelo/Techo
-        ctx.fillStyle = player.onCeiling ? '#f0f' : '#0ff';
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = ctx.fillStyle;
-        ctx.fillRect(0, 0, canvas.width, 4);
-        ctx.fillRect(0, canvas.height - 4, canvas.width, 4);
-
-        // Jugador
-        ctx.shadowBlur = 20;
-        ctx.shadowColor = player.color;
-        ctx.fillStyle = player.color;
-        ctx.fillRect(player.x, player.y, player.w, player.h);
-
-        // Obstáculos
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#f00';
-        ctx.fillStyle = '#f00';
-        obstacles.forEach(obs => {
-            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-        });
-        
-        ctx.shadowBlur = 0;
-    }
-
-    function loop() {
-        update();
-        draw();
-        requestAnimationFrame(loop);
-    }
-
-    window.addEventListener('pointerdown', (e) => {
-        e.preventDefault();
-        if (!gameActive) {
-            resetGame();
-            gameActive = true;
-            msgEl.style.display = 'none';
-        } else {
-            player.onCeiling = !player.onCeiling;
-            player.color = player.onCeiling ? '#f0f' : '#0ff';
-            // VIBRACIÓN SUAVE AL CAMBIAR
-            if (window.navigator.vibrate) window.navigator.vibrate(40);
+            score += 0.1;
+            document.getElementById('score').innerText = Math.floor(score);
         }
-    }, { passive: false });
+        renderer.render(scene, camera);
+    }
 
-    loop();
+    // Control
+    window.addEventListener('pointerdown', () => {
+        gravity = -gravity;
+        player.material.color.set(gravity > 0 ? 0xff00ff : 0x00ffff);
+    });
+
+    animate();
 </script>
 </body>
 </html>
